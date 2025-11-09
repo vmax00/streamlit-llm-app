@@ -205,3 +205,15 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Google Cloud credentials
+*.json
+credentials/
+!requirements.json
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Business card images (temporary uploads)
+uploads/
+temp/
