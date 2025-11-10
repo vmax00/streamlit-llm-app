@@ -2,6 +2,38 @@
 
 Cloud Vision API と Gemini API を活用した、名刺のOCR読み取り・管理アプリケーションです。
 
+## 🚀 クイックスタート（初心者向け）
+
+**初めての方はこちらから！**
+
+### ⚡ 3ステップで始める
+
+1. **セットアップスクリプトを実行**
+   ```bash
+   # Windows の場合
+   setup.bat をダブルクリック
+
+   # Mac / Linux の場合
+   ./setup.sh
+   ```
+
+2. **APIキーを取得**（詳しくは [SETUP_GUIDE.md](SETUP_GUIDE.md) を参照）
+   - [Gemini API キー](https://makersuite.google.com/app/apikey)
+   - [Google Cloud 認証情報](https://console.cloud.google.com/)
+
+3. **アプリを起動**
+   ```bash
+   # Windows の場合
+   run.bat をダブルクリック
+
+   # Mac / Linux の場合
+   ./run.sh
+   ```
+
+**詳しい手順は → [📖 SETUP_GUIDE.md](SETUP_GUIDE.md) をご覧ください**
+
+---
+
 ## ✨ 機能
 
 - 📤 **名刺画像のアップロード** - PNG/JPG形式の名刺画像をアップロード
