@@ -1,64 +1,64 @@
 @echo off
 chcp 65001 > nul
 echo ========================================
-echo   名刺管理アプリ - セットアップ
+echo   Business Card Manager - Setup
 echo ========================================
 echo.
 
-REM プロジェクトディレクトリに移動
+REM Change to project directory
 cd /d %~dp0
 
-REM Pythonのバージョンを確認
-echo [1/4] Pythonのバージョンを確認しています...
+REM Check Python version
+echo [1/4] Checking Python version...
 python --version
 if %errorlevel% neq 0 (
-    echo エラー: Pythonがインストールされていません。
-    echo https://www.python.org/downloads/ からPythonをダウンロードしてください。
+    echo ERROR: Python is not installed.
+    echo Please download Python from: https://www.python.org/downloads/
     pause
     exit /b 1
 )
 echo.
 
-REM 仮想環境を作成
-echo [2/4] 仮想環境を作成しています...
+REM Create virtual environment
+echo [2/4] Creating virtual environment...
 if exist venv (
-    echo 仮想環境は既に存在します。スキップします。
+    echo Virtual environment already exists. Skipping...
 ) else (
     python -m venv venv
-    echo 仮想環境を作成しました。
+    echo Virtual environment created successfully.
 )
 echo.
 
-REM 仮想環境を有効化
-echo [3/4] 仮想環境を有効化しています...
+REM Activate virtual environment
+echo [3/4] Activating virtual environment...
 call venv\Scripts\activate.bat
 
-REM 依存パッケージをインストール
-echo [4/4] 依存パッケージをインストールしています...
-echo これには数分かかる場合があります...
+REM Install dependencies
+echo [4/4] Installing dependencies...
+echo This may take a few minutes...
 echo.
 pip install -r requirements.txt
 
 echo.
 echo ========================================
-echo   セットアップが完了しました！
+echo   Setup completed successfully!
 echo ========================================
 echo.
-echo 次のステップ:
-echo 1. Gemini API キーを取得
+echo Next steps:
+echo 1. Get Gemini API key
 echo    https://makersuite.google.com/app/apikey
 echo.
-echo 2. Google Cloud 認証情報を取得
+echo 2. Get Google Cloud credentials
 echo    https://console.cloud.google.com/
-echo    - Cloud Vision API を有効化
-echo    - Google Sheets API を有効化
-echo    - サービスアカウントを作成してJSON認証情報をダウンロード
+echo    - Enable Cloud Vision API
+echo    - Enable Google Sheets API
+echo    - Create service account and download JSON credentials
 echo.
-echo 3. アプリを起動
-echo    run.bat をダブルクリック、または以下を実行:
+echo 3. Run the app
+echo    Double-click run.bat or execute:
 echo    streamlit run app.py
 echo.
-echo 詳しい手順は SETUP_GUIDE.md を参照してください。
+echo For detailed instructions, see SETUP_GUIDE.md
 echo.
 
 pause

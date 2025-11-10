@@ -1,30 +1,29 @@
 @echo off
 chcp 65001 > nul
 echo ========================================
-echo   名刺管理アプリを起動しています...
+echo   Business Card Manager - Starting...
 echo ========================================
 echo.
 
-REM プロジェクトディレクトリに移動
+REM Change to project directory
 cd /d %~dp0
 
-REM 仮想環境が存在するか確認
+REM Check if virtual environment exists
 if exist venv\Scripts\activate.bat (
-    echo 仮想環境を有効化しています...
+    echo Activating virtual environment...
     call venv\Scripts\activate.bat
 ) else (
-    echo 警告: 仮想環境が見つかりません。システムのPythonを使用します。
-    echo 仮想環境を作成する場合は、以下を実行してください:
-    echo python -m venv venv
+    echo WARNING: Virtual environment not found. Using system Python.
+    echo To create virtual environment, run: python -m venv venv
     echo.
 )
 
-REM Streamlitアプリを起動
-echo Streamlitアプリを起動しています...
-echo ブラウザが自動的に開きます。開かない場合は以下にアクセス:
+REM Start Streamlit app
+echo Starting Streamlit app...
+echo Browser will open automatically. If not, go to:
 echo http://localhost:8501
 echo.
-echo アプリを停止するには Ctrl+C を押してください
+echo Press Ctrl+C to stop the app
 echo.
 
 streamlit run app.py
