@@ -1,5 +1,6 @@
 """名刺管理アプリ - メインアプリケーション"""
 import os
+import tempfile
 from io import BytesIO
 import streamlit as st
 from PIL import Image
@@ -77,7 +78,9 @@ def main():
         # 認証情報を一時保存
         credentials_path = None
         if credentials_file:
-            credentials_path = "/tmp/google_credentials.json"
+            # クロスプラットフォーム対応：システムの一時ディレクトリを使用
+            temp_dir = tempfile.gettempdir()
+            credentials_path = os.path.join(temp_dir, "google_credentials.json")
             with open(credentials_path, 'wb') as f:
                 f.write(credentials_file.getvalue())
 
