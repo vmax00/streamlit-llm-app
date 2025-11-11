@@ -32,7 +32,8 @@ class GeminiAnalyzer:
                 return False
 
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            # 利用可能な最新モデルを使用
+            self.model = genai.GenerativeModel('gemini-pro')
             return True
         except Exception as e:
             st.error(f"Gemini モデルの初期化に失敗しました: {str(e)}")
