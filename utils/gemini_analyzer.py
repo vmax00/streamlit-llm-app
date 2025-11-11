@@ -32,10 +32,36 @@ class GeminiAnalyzer:
                 return False
 
             genai.configure(api_key=self.api_key)
-            # 安定版モデルを使用（名刺情報抽出に最適）
-            # gemini-pro: 最も安定、広く利用可能、名刺解析に十分な精度
-            self.model = genai.GenerativeModel('gemini-pro')
-            return True
+
+            # 利用可能なモデルを確認（デバッグ用）
+            try:
+                available_models = [m.name for m in genai.list_models()]
+                st.info(f"利用可能なモデル: {', '.join(available_models[:5])}...")
+            except Exception as list_error:
+                st.warning(f"モデル一覧の取得に失敗: {str(list_error)}")
+
+            # 複数のモデル名を試行
+            model_names = [
+                'gemini-1.5-flash',
+                'gemini-1.5-pro',
+                'gemini-pro',
+                'models/gemini-1.5-flash',
+                'models/gemini-1.5-pro',
+                'models/gemini-pro'
+            ]
+
+            for model_name in model_names:
+                try:
+                    self.model = genai.GenerativeModel(model_name)
+                    st.success(f"✅ モデル '{model_name}' を使用します")
+                    return True
+                except Exception as model_error:
+                    continue
+
+            # すべて失敗した場合
+            st.error("利用可能なGeminiモデルが見つかりませんでした。APIキーを確認してください。")
+            return False
+
         except Exception as e:
             st.error(f"Gemini モデルの初期化に失敗しました: {str(e)}")
             return False
