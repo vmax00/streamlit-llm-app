@@ -2,9 +2,8 @@
 from typing import List, Dict
 from io import BytesIO
 import pandas as pd
-from openpyxl import Workbook
+from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
 
 
 class ExcelExporter:
@@ -22,11 +21,6 @@ class ExcelExporter:
         Returns:
             Excelファイルのバイナリデータ
         """
-        # 新しいワークブックを作成
-        wb = Workbook()
-        ws = wb.active
-        ws.title = sheet_name
-
         # 列名を日本語に変換
         column_names = {
             "name": "氏名",
@@ -50,41 +44,55 @@ class ExcelExporter:
         # 内部フィールド（_で始まる列）を除外
         df_export = df_export[[col for col in df_export.columns if not col.startswith('_')]]
 
-        # DataFrameをワークシートに書き込み
-        for r_idx, row in enumerate(dataframe_to_rows(df_export, index=False, header=True), 1):
-            for c_idx, value in enumerate(row, 1):
-                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+        # BytesIOオブジェクトを作成
+        output = BytesIO()
 
-                # ヘッダー行のスタイル設定
-                if r_idx == 1:
-                    cell.font = Font(bold=True, color="FFFFFF")
-                    cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-                    cell.alignment = Alignment(horizontal="center", vertical="center")
+        # pandasを使ってExcelに書き込み（文字化け防止）
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_export.to_excel(writer, sheet_name=sheet_name, index=False)
 
-                # すべてのセルに罫線を追加
-                thin_border = Border(
-                    left=Side(style='thin'),
-                    right=Side(style='thin'),
-                    top=Side(style='thin'),
-                    bottom=Side(style='thin')
-                )
+        # スタイルを適用するためにワークブックを再読み込み
+        output.seek(0)
+        wb = load_workbook(output)
+        ws = wb[sheet_name]
+
+        # ヘッダー行のスタイル設定
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF", name="メイリオ")
+            cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # すべてのセルに罫線とスタイルを追加
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+            for cell in row:
                 cell.border = thin_border
-
                 # データ行のスタイル設定
-                if r_idx > 1:
+                if cell.row > 1:
                     cell.alignment = Alignment(vertical="center", wrap_text=True)
+                    # 日本語フォントを指定
+                    cell.font = Font(name="メイリオ")
 
         # 列幅を自動調整
-        for column in ws.columns:
+        for column_cells in ws.columns:
             max_length = 0
-            column_letter = column[0].column_letter
+            column_letter = column_cells[0].column_letter
 
-            for cell in column:
+            for cell in column_cells:
                 try:
                     if cell.value:
-                        cell_length = len(str(cell.value))
-                        if cell_length > max_length:
-                            max_length = cell_length
+                        # 日本語文字を考慮した幅計算
+                        cell_value = str(cell.value)
+                        # 日本語は1文字=2、英数字は1文字=1として計算
+                        length = sum(2 if ord(c) > 127 else 1 for c in cell_value)
+                        if length > max_length:
+                            max_length = length
                 except:
                     pass
 
@@ -124,73 +132,3 @@ class ExcelExporter:
             df = pd.DataFrame(cards)
 
         return ExcelExporter.create_excel_from_dataframe(df, sheet_name)
-
-    @staticmethod
-    def create_formatted_excel(
-        cards: List[Dict[str, str]],
-        title: str = "名刺管理データ",
-        include_summary: bool = True
-    ) -> BytesIO:
-        """
-        フォーマット済みのExcelファイルを作成（サマリー付き）
-
-        Args:
-            cards: 名刺データのリスト
-            title: ファイルのタイトル
-            include_summary: サマリーシートを含めるか
-
-        Returns:
-            Excelファイルのバイナリデータ
-        """
-        wb = Workbook()
-
-        # サマリーシートを作成
-        if include_summary and cards:
-            ws_summary = wb.active
-            ws_summary.title = "サマリー"
-
-            # タイトル
-            ws_summary['A1'] = title
-            ws_summary['A1'].font = Font(size=16, bold=True)
-            ws_summary.merge_cells('A1:B1')
-
-            # 統計情報
-            ws_summary['A3'] = "総件数"
-            ws_summary['B3'] = len(cards)
-
-            # 会社別集計
-            df = pd.DataFrame(cards)
-            if 'company' in df.columns:
-                company_counts = df['company'].value_counts()
-                ws_summary['A5'] = "会社別集計（上位10社）"
-                ws_summary['A5'].font = Font(bold=True)
-
-                for idx, (company, count) in enumerate(company_counts.head(10).items(), start=6):
-                    ws_summary[f'A{idx}'] = company
-                    ws_summary[f'B{idx}'] = count
-
-            # 列幅調整
-            ws_summary.column_dimensions['A'].width = 30
-            ws_summary.column_dimensions['B'].width = 15
-
-        # データシートを作成
-        if cards:
-            if include_summary:
-                ws_data = wb.create_sheet(title="名刺データ")
-            else:
-                ws_data = wb.active
-                ws_data.title = "名刺データ"
-
-            df = pd.DataFrame(cards)
-            excel_data = ExcelExporter.create_excel_from_dataframe(df, "名刺データ")
-
-            # 既存のワークブックにデータシートをコピー
-            # （簡略化のため、新しいワークブックを作成して返す）
-            return excel_data
-
-        # BytesIOに保存
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        return output
