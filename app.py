@@ -10,6 +10,7 @@ from utils.vision_ocr import VisionOCR
 from utils.gemini_analyzer import GeminiAnalyzer
 from utils.google_sheets import GoogleSheetsManager
 from utils.data_storage import DataStorage
+from utils.batch_processor import BatchProcessor
 
 
 # ページ設定
@@ -92,7 +93,7 @@ def main():
         st.metric("登録件数", f"{card_count} 件")
 
     # メインコンテンツ
-    tab1, tab2, tab3, tab4 = st.tabs(["📤 名刺登録", "📋 データ一覧", "🔍 検索", "⚡ エクスポート"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📤 名刺登録", "📦 一括処理", "📋 データ一覧", "🔍 検索", "⚡ エクスポート"])
 
     # タブ1: 名刺登録
     with tab1:
@@ -200,8 +201,238 @@ def main():
                 else:
                     st.info("👆 画像をアップロードして、OCR処理を実行してください。")
 
-    # タブ2: データ一覧
+    # タブ2: 一括処理
     with tab2:
+        st.header("📦 複数名刺の一括処理")
+
+        st.markdown("""
+        複数の名刺画像を一度にアップロードして、自動または手動で処理できます。
+        """)
+
+        # 処理モード選択
+        processing_mode = st.radio(
+            "処理モード",
+            ["🤖 自動一括処理", "👁️ 手動確認モード"],
+            help="自動モード：すべて自動で処理して保存 / 手動モード：1枚ずつ確認しながら保存"
+        )
+
+        # 複数ファイルアップロード
+        uploaded_files = st.file_uploader(
+            "名刺画像をアップロード（複数選択可）",
+            type=['png', 'jpg', 'jpeg'],
+            accept_multiple_files=True,
+            help="複数の名刺画像を一度に選択できます"
+        )
+
+        if uploaded_files:
+            st.info(f"📂 {len(uploaded_files)} 枚の画像が選択されています")
+
+            # 自動一括処理モード
+            if processing_mode == "🤖 自動一括処理":
+                st.subheader("自動一括処理")
+
+                if st.button("🚀 すべて自動処理して保存", type="primary", use_container_width=True):
+                    if not credentials_path:
+                        st.error("Google Cloud 認証情報をアップロードしてください。")
+                    elif not gemini_api_key:
+                        st.error("Gemini API キーを入力してください。")
+                    else:
+                        # バッチプロセッサーを初期化
+                        batch_processor = BatchProcessor(
+                            credentials_path=credentials_path,
+                            gemini_api_key=gemini_api_key
+                        )
+
+                        # プログレスバーとステータス表示
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+
+                        def update_progress(current, total, filename):
+                            progress = current / total if total > 0 else 0
+                            progress_bar.progress(progress)
+                            status_text.text(f"処理中: {current}/{total} - {filename}")
+
+                        # 一括処理実行
+                        with st.spinner("名刺を一括処理しています..."):
+                            result = batch_processor.process_batch_auto(
+                                uploaded_files,
+                                progress_callback=update_progress
+                            )
+
+                        # 結果を表示
+                        st.success(f"✅ 処理完了: 成功 {result['success_count']} 件 / エラー {result['error_count']} 件")
+
+                        # 成功した名刺をデータベースに保存
+                        if result['results']:
+                            for card_data in result['results']:
+                                # 内部フィールドを削除
+                                clean_data = {k: v for k, v in card_data.items() if not k.startswith('_')}
+                                DataStorage.add_card(clean_data)
+
+                            st.balloons()
+                            st.success(f"🎉 {len(result['results'])} 件の名刺を保存しました！")
+
+                        # エラーがあれば表示
+                        if result['errors']:
+                            with st.expander(f"⚠️ エラー詳細 ({len(result['errors'])} 件)", expanded=True):
+                                for error in result['errors']:
+                                    st.error(f"**{error['filename']}**: {error['error']}")
+
+                        # 処理結果のプレビュー
+                        if result['results']:
+                            with st.expander("📋 処理された名刺のプレビュー", expanded=True):
+                                df = pd.DataFrame(result['results'])
+                                # 内部フィールドを除外
+                                display_df = df[[col for col in df.columns if not col.startswith('_')]]
+                                st.dataframe(display_df, use_container_width=True)
+
+            # 手動確認モード
+            else:
+                st.subheader("手動確認モード")
+                st.info("1枚ずつ確認しながら処理します。各名刺の情報を編集してから保存できます。")
+
+                # セッションステートで現在の処理インデックスを管理
+                if 'batch_index' not in st.session_state:
+                    st.session_state.batch_index = 0
+                if 'batch_results' not in st.session_state:
+                    st.session_state.batch_results = {}
+
+                current_index = st.session_state.batch_index
+
+                if current_index < len(uploaded_files):
+                    current_file = uploaded_files[current_index]
+
+                    st.write(f"**進捗:** {current_index + 1} / {len(uploaded_files)}")
+                    progress_percentage = (current_index + 1) / len(uploaded_files)
+                    st.progress(progress_percentage)
+
+                    col1, col2 = st.columns([1, 1])
+
+                    with col1:
+                        st.subheader(f"📄 {current_file.name}")
+                        image = Image.open(current_file)
+                        st.image(image, use_container_width=True)
+
+                        # OCR処理ボタン
+                        if st.button("🔍 この名刺を処理", type="primary", use_container_width=True, key=f"process_{current_index}"):
+                            if not credentials_path:
+                                st.error("Google Cloud 認証情報をアップロードしてください。")
+                            elif not gemini_api_key:
+                                st.error("Gemini API キーを入力してください。")
+                            else:
+                                with st.spinner(f"名刺を解析しています... ({current_index + 1}/{len(uploaded_files)})"):
+                                    # 画像をバイト配列に変換
+                                    img_byte_arr = BytesIO()
+                                    image.save(img_byte_arr, format='PNG')
+                                    img_bytes = img_byte_arr.getvalue()
+
+                                    # バッチプロセッサーで処理
+                                    batch_processor = BatchProcessor(
+                                        credentials_path=credentials_path,
+                                        gemini_api_key=gemini_api_key
+                                    )
+
+                                    success, card_data, error_msg = batch_processor.process_single_card(
+                                        img_bytes,
+                                        current_file.name
+                                    )
+
+                                    if success:
+                                        st.session_state.batch_results[current_index] = card_data
+                                        st.success("✅ 名刺情報の抽出が完了しました")
+                                    else:
+                                        st.error(f"❌ エラー: {error_msg}")
+
+                    with col2:
+                        st.subheader("抽出された情報")
+
+                        if current_index in st.session_state.batch_results:
+                            card_data = st.session_state.batch_results[current_index]
+
+                            # フォームで編集可能にする
+                            with st.form(f"batch_card_form_{current_index}"):
+                                col_a, col_b = st.columns(2)
+
+                                with col_a:
+                                    name = st.text_input("氏名", value=card_data.get("name", ""))
+                                    name_kana = st.text_input("氏名（かな）", value=card_data.get("name_kana", ""))
+                                    company = st.text_input("会社名", value=card_data.get("company", ""))
+                                    department = st.text_input("部署", value=card_data.get("department", ""))
+                                    position = st.text_input("役職", value=card_data.get("position", ""))
+                                    postal_code = st.text_input("郵便番号", value=card_data.get("postal_code", ""))
+
+                                with col_b:
+                                    address = st.text_area("住所", value=card_data.get("address", ""), height=100)
+                                    phone = st.text_input("電話番号", value=card_data.get("phone", ""))
+                                    mobile = st.text_input("携帯電話", value=card_data.get("mobile", ""))
+                                    fax = st.text_input("FAX", value=card_data.get("fax", ""))
+                                    email = st.text_input("メールアドレス", value=card_data.get("email", ""))
+                                    website = st.text_input("ウェブサイト", value=card_data.get("website", ""))
+
+                                # ボタン
+                                col_btn1, col_btn2, col_btn3 = st.columns(3)
+
+                                with col_btn1:
+                                    save_button = st.form_submit_button("💾 保存して次へ", use_container_width=True, type="primary")
+
+                                with col_btn2:
+                                    skip_button = st.form_submit_button("⏭️ スキップ", use_container_width=True)
+
+                                with col_btn3:
+                                    cancel_button = st.form_submit_button("❌ キャンセル", use_container_width=True)
+
+                                if save_button:
+                                    # データを保存
+                                    new_card_data = {
+                                        "name": name,
+                                        "name_kana": name_kana,
+                                        "company": company,
+                                        "department": department,
+                                        "position": position,
+                                        "postal_code": postal_code,
+                                        "address": address,
+                                        "phone": phone,
+                                        "mobile": mobile,
+                                        "fax": fax,
+                                        "email": email,
+                                        "website": website
+                                    }
+                                    DataStorage.add_card(new_card_data)
+                                    st.success(f"✅ {name} さんの名刺を保存しました！")
+
+                                    # 次の名刺へ
+                                    st.session_state.batch_index += 1
+                                    if current_index in st.session_state.batch_results:
+                                        del st.session_state.batch_results[current_index]
+                                    st.rerun()
+
+                                if skip_button:
+                                    # スキップして次へ
+                                    st.session_state.batch_index += 1
+                                    if current_index in st.session_state.batch_results:
+                                        del st.session_state.batch_results[current_index]
+                                    st.rerun()
+
+                                if cancel_button:
+                                    # 処理をキャンセル
+                                    st.session_state.batch_index = 0
+                                    st.session_state.batch_results = {}
+                                    st.warning("処理をキャンセルしました")
+                                    st.rerun()
+
+                        else:
+                            st.info("👆 「この名刺を処理」ボタンをクリックしてOCR処理を開始してください")
+
+                else:
+                    # すべての処理が完了
+                    st.success("🎉 すべての名刺の処理が完了しました！")
+                    if st.button("🔄 最初から再開", use_container_width=True):
+                        st.session_state.batch_index = 0
+                        st.session_state.batch_results = {}
+                        st.rerun()
+
+    # タブ3: データ一覧
+    with tab3:
         st.header("登録済み名刺一覧")
 
         cards = DataStorage.get_all_cards()
@@ -257,8 +488,8 @@ def main():
         else:
             st.info("まだ名刺が登録されていません。")
 
-    # タブ3: 検索
-    with tab3:
+    # タブ4: 検索
+    with tab4:
         st.header("名刺検索")
 
         search_query = st.text_input(
@@ -311,8 +542,8 @@ def main():
             else:
                 st.warning("検索結果が見つかりませんでした。")
 
-    # タブ4: エクスポート
-    with tab4:
+    # タブ5: エクスポート
+    with tab5:
         st.header("データエクスポート")
 
         cards = DataStorage.get_all_cards()
