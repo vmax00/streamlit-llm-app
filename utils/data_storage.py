@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 import json
 import os
+from datetime import datetime
 
 
 class DataStorage:
@@ -12,6 +13,7 @@ class DataStorage:
     # データファイルのパス
     DATA_DIR = "data"
     DATA_FILE = os.path.join(DATA_DIR, "business_cards.json")
+    BATCH_GROUPS_FILE = os.path.join(DATA_DIR, "batch_groups.json")
 
     @staticmethod
     def initialize_session_state():
@@ -239,3 +241,111 @@ class DataStorage:
         """
         DataStorage.initialize_session_state()
         return len(st.session_state.business_cards)
+
+    @staticmethod
+    def add_batch_group(cards: List[Dict[str, str]], metadata: Optional[Dict] = None) -> str:
+        """
+        一括処理の結果をグループとして保存
+
+        Args:
+            cards: 名刺データのリスト
+            metadata: グループに関するメタデータ（オプション）
+
+        Returns:
+            グループID
+        """
+        try:
+            # グループIDを生成（タイムスタンプベース）
+            group_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # バッチグループのデータを作成
+            batch_group = {
+                "group_id": group_id,
+                "timestamp": datetime.now().isoformat(),
+                "card_count": len(cards),
+                "cards": cards,
+                "metadata": metadata or {}
+            }
+
+            # 既存のグループを読み込み
+            batch_groups = DataStorage._load_batch_groups()
+
+            # 新しいグループを追加
+            batch_groups.append(batch_group)
+
+            # ファイルに保存
+            DataStorage._save_batch_groups(batch_groups)
+
+            return group_id
+
+        except Exception as e:
+            st.error(f"バッチグループの保存に失敗しました: {str(e)}")
+            return None
+
+    @staticmethod
+    def _load_batch_groups() -> List[Dict]:
+        """
+        バッチグループをファイルから読み込み
+
+        Returns:
+            バッチグループのリスト
+        """
+        try:
+            if os.path.exists(DataStorage.BATCH_GROUPS_FILE):
+                with open(DataStorage.BATCH_GROUPS_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return []
+        except Exception as e:
+            st.error(f"バッチグループの読み込みに失敗しました: {str(e)}")
+            return []
+
+    @staticmethod
+    def _save_batch_groups(batch_groups: List[Dict]) -> bool:
+        """
+        バッチグループをファイルに保存
+
+        Args:
+            batch_groups: バッチグループのリスト
+
+        Returns:
+            成功したかどうか
+        """
+        try:
+            # データディレクトリが存在しない場合は作成
+            if not os.path.exists(DataStorage.DATA_DIR):
+                os.makedirs(DataStorage.DATA_DIR)
+
+            with open(DataStorage.BATCH_GROUPS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(batch_groups, f, ensure_ascii=False, indent=2)
+
+            return True
+        except Exception as e:
+            st.error(f"バッチグループの保存に失敗しました: {str(e)}")
+            return False
+
+    @staticmethod
+    def get_all_batch_groups() -> List[Dict]:
+        """
+        すべてのバッチグループを取得
+
+        Returns:
+            バッチグループのリスト
+        """
+        return DataStorage._load_batch_groups()
+
+    @staticmethod
+    def get_batch_group(group_id: str) -> Optional[Dict]:
+        """
+        指定されたIDのバッチグループを取得
+
+        Args:
+            group_id: グループID
+
+        Returns:
+            バッチグループ（存在しない場合はNone）
+        """
+        batch_groups = DataStorage._load_batch_groups()
+        for group in batch_groups:
+            if group.get('group_id') == group_id:
+                return group
+        return None

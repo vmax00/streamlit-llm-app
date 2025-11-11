@@ -254,31 +254,63 @@ def main():
                         # プログレスバーとステータス表示
                         progress_bar = st.progress(0)
                         status_text = st.empty()
+                        time_text = st.empty()
 
                         def update_progress(current, total, filename):
                             progress = current / total if total > 0 else 0
                             progress_bar.progress(progress)
                             status_text.text(f"処理中: {current}/{total} - {filename}")
 
+                        def update_time(estimated_time, estimated_seconds):
+                            minutes = int(estimated_seconds // 60)
+                            seconds = int(estimated_seconds % 60)
+                            time_text.info(f"⏱️ 予想終了時間: {estimated_time.strftime('%H:%M:%S')} (残り約 {minutes}分{seconds}秒)")
+
                         # 一括処理実行
                         with st.spinner("名刺を一括処理しています..."):
                             result = batch_processor.process_batch_auto(
                                 uploaded_files,
-                                progress_callback=update_progress
+                                progress_callback=update_progress,
+                                time_callback=update_time
                             )
 
                         # 結果を表示
-                        st.success(f"✅ 処理完了: 成功 {result['success_count']} 件 / エラー {result['error_count']} 件")
+                        result_message = f"✅ 処理完了: 成功 {result['success_count']} 件"
+                        if result['skipped_count'] > 0:
+                            result_message += f" / スキップ {result['skipped_count']} 件"
+                        if result['error_count'] > 0:
+                            result_message += f" / エラー {result['error_count']} 件"
+                        st.success(result_message)
 
                         # 成功した名刺をデータベースに保存
                         if result['results']:
+                            # 個別の名刺として保存
+                            clean_results = []
                             for card_data in result['results']:
                                 # 内部フィールドを削除
                                 clean_data = {k: v for k, v in card_data.items() if not k.startswith('_')}
                                 DataStorage.add_card(clean_data)
+                                clean_results.append(clean_data)
+
+                            # バッチグループとしても保存
+                            group_id = DataStorage.add_batch_group(
+                                clean_results,
+                                metadata={
+                                    'total_files': len(uploaded_files),
+                                    'success_count': result['success_count'],
+                                    'error_count': result['error_count'],
+                                    'skipped_count': result['skipped_count']
+                                }
+                            )
 
                             st.balloons()
-                            st.success(f"🎉 {len(result['results'])} 件の名刺を保存しました！")
+                            st.success(f"🎉 {len(result['results'])} 件の名刺を保存しました！ (グループID: {group_id})")
+
+                        # スキップされたファイルがあれば表示
+                        if result.get('skipped'):
+                            with st.expander(f"⏭️ スキップされたファイル ({len(result['skipped'])} 件)", expanded=False):
+                                for skipped in result['skipped']:
+                                    st.warning(f"**{skipped['filename']}**: {skipped['reason']}")
 
                         # エラーがあれば表示
                         if result['errors']:
@@ -681,6 +713,58 @@ def main():
 
         else:
             st.info("エクスポートするデータがありません。")
+
+        # バッチグループ履歴
+        st.divider()
+        st.subheader("📦 一括処理の履歴")
+
+        batch_groups = DataStorage.get_all_batch_groups()
+
+        if batch_groups:
+            st.info(f"これまでに {len(batch_groups)} 回の一括処理が行われています。")
+
+            # 最新のグループから表示
+            for group in reversed(batch_groups):
+                group_id = group.get('group_id', '不明')
+                timestamp = group.get('timestamp', '不明')
+                card_count = group.get('card_count', 0)
+                metadata = group.get('metadata', {})
+
+                # タイムスタンプを整形
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(timestamp)
+                    formatted_time = dt.strftime('%Y年%m月%d日 %H:%M:%S')
+                except:
+                    formatted_time = timestamp
+
+                with st.expander(f"🗂️ {formatted_time} - {card_count}件の名刺", expanded=False):
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.write(f"**グループID:** {group_id}")
+                        st.write(f"**処理日時:** {formatted_time}")
+                        st.write(f"**登録件数:** {card_count} 件")
+
+                    with col2:
+                        if metadata:
+                            st.write(f"**総ファイル数:** {metadata.get('total_files', '-')} 枚")
+                            st.write(f"**成功:** {metadata.get('success_count', '-')} 件")
+                            st.write(f"**スキップ:** {metadata.get('skipped_count', '-')} 件")
+                            st.write(f"**エラー:** {metadata.get('error_count', '-')} 件")
+
+                    # このグループをExcelでエクスポート
+                    if group.get('cards'):
+                        excel_data = ExcelExporter.create_excel_from_cards(group['cards'])
+                        st.download_button(
+                            label=f"📊 このグループをExcelでダウンロード",
+                            data=excel_data,
+                            file_name=f"batch_{group_id}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"download_batch_{group_id}"
+                        )
+        else:
+            st.info("まだ一括処理の履歴がありません。")
 
     # フッター
     st.divider()
