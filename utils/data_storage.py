@@ -2,16 +2,66 @@
 from typing import List, Dict, Optional
 import pandas as pd
 import streamlit as st
+import json
+import os
 
 
 class DataStorage:
     """名刺データを管理するクラス"""
+
+    # データファイルのパス
+    DATA_DIR = "data"
+    DATA_FILE = os.path.join(DATA_DIR, "business_cards.json")
 
     @staticmethod
     def initialize_session_state():
         """セッションステートを初期化"""
         if 'business_cards' not in st.session_state:
             st.session_state.business_cards = []
+
+    @staticmethod
+    def save_to_file():
+        """
+        セッションステートのデータをJSONファイルに保存
+        """
+        try:
+            # データディレクトリが存在しない場合は作成
+            if not os.path.exists(DataStorage.DATA_DIR):
+                os.makedirs(DataStorage.DATA_DIR)
+
+            # データをJSONファイルに保存
+            DataStorage.initialize_session_state()
+            cards = st.session_state.business_cards
+
+            with open(DataStorage.DATA_FILE, 'w', encoding='utf-8') as f:
+                json.dump(cards, f, ensure_ascii=False, indent=2)
+
+            return True
+        except Exception as e:
+            st.error(f"データの保存に失敗しました: {str(e)}")
+            return False
+
+    @staticmethod
+    def load_from_file():
+        """
+        JSONファイルからデータを読み込んでセッションステートに設定
+        """
+        try:
+            if os.path.exists(DataStorage.DATA_FILE):
+                with open(DataStorage.DATA_FILE, 'r', encoding='utf-8') as f:
+                    cards = json.load(f)
+
+                DataStorage.initialize_session_state()
+                st.session_state.business_cards = cards
+                return True
+            else:
+                # ファイルが存在しない場合は空の状態で初期化
+                DataStorage.initialize_session_state()
+                return True
+        except Exception as e:
+            st.error(f"データの読み込みに失敗しました: {str(e)}")
+            DataStorage.initialize_session_state()
+            return False
 
     @staticmethod
     def add_card(card_data: Dict[str, str]):
@@ -23,6 +73,8 @@ class DataStorage:
         """
         DataStorage.initialize_session_state()
         st.session_state.business_cards.append(card_data)
+        # 自動保存
+        DataStorage.save_to_file()
 
     @staticmethod
     def get_all_cards() -> List[Dict[str, str]]:
@@ -68,6 +120,8 @@ class DataStorage:
         cards = st.session_state.business_cards
         if 0 <= index < len(cards):
             st.session_state.business_cards[index] = card_data
+            # 自動保存
+            DataStorage.save_to_file()
             return True
         return False
 
@@ -86,6 +140,8 @@ class DataStorage:
         cards = st.session_state.business_cards
         if 0 <= index < len(cards):
             st.session_state.business_cards.pop(index)
+            # 自動保存
+            DataStorage.save_to_file()
             return True
         return False
 
@@ -93,6 +149,8 @@ class DataStorage:
     def clear_all_cards():
         """すべての名刺データをクリア"""
         st.session_state.business_cards = []
+        # 自動保存
+        DataStorage.save_to_file()
 
     @staticmethod
     def search_cards(query: str, fields: Optional[List[str]] = None) -> List[Dict[str, str]]:
@@ -144,7 +202,7 @@ class DataStorage:
             # 空の DataFrame を返す
             return pd.DataFrame(columns=[
                 "name", "name_kana", "company", "department", "position",
-                "postal_code", "address", "phone", "mobile", "fax", "email", "website"
+                "postal_code", "address_1", "address_2", "phone", "mobile", "fax", "email", "website"
             ])
 
         return pd.DataFrame(cards)

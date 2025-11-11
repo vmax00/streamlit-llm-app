@@ -52,6 +52,11 @@ def main():
     # セッションステートの初期化
     DataStorage.initialize_session_state()
 
+    # 保存されたデータを読み込み（初回のみ）
+    if 'data_loaded' not in st.session_state:
+        DataStorage.load_from_file()
+        st.session_state.data_loaded = True
+
     # ヘッダー
     st.markdown('<div class="main-header">📇 名刺管理アプリ</div>', unsafe_allow_html=True)
 
@@ -169,7 +174,8 @@ def main():
                             postal_code = st.text_input("郵便番号", value=card_data.get("postal_code", ""))
 
                         with col_b:
-                            address = st.text_area("住所", value=card_data.get("address", ""), height=100)
+                            address_1 = st.text_input("住所1（番地まで）", value=card_data.get("address_1", ""))
+                            address_2 = st.text_input("住所2（建物名等）", value=card_data.get("address_2", ""))
                             phone = st.text_input("電話番号", value=card_data.get("phone", ""))
                             mobile = st.text_input("携帯電話", value=card_data.get("mobile", ""))
                             fax = st.text_input("FAX", value=card_data.get("fax", ""))
@@ -188,7 +194,8 @@ def main():
                                 "department": department,
                                 "position": position,
                                 "postal_code": postal_code,
-                                "address": address,
+                                "address_1": address_1,
+                                "address_2": address_2,
                                 "phone": phone,
                                 "mobile": mobile,
                                 "fax": fax,
@@ -395,7 +402,8 @@ def main():
                                     postal_code = st.text_input("郵便番号", value=card_data.get("postal_code", ""))
 
                                 with col_b:
-                                    address = st.text_area("住所", value=card_data.get("address", ""), height=100)
+                                    address_1 = st.text_input("住所1（番地まで）", value=card_data.get("address_1", ""))
+                                    address_2 = st.text_input("住所2（建物名等）", value=card_data.get("address_2", ""))
                                     phone = st.text_input("電話番号", value=card_data.get("phone", ""))
                                     mobile = st.text_input("携帯電話", value=card_data.get("mobile", ""))
                                     fax = st.text_input("FAX", value=card_data.get("fax", ""))
@@ -423,7 +431,8 @@ def main():
                                         "department": department,
                                         "position": position,
                                         "postal_code": postal_code,
-                                        "address": address,
+                                        "address_1": address_1,
+                                        "address_2": address_2,
                                         "phone": phone,
                                         "mobile": mobile,
                                         "fax": fax,
@@ -481,7 +490,8 @@ def main():
                 "department": "部署",
                 "position": "役職",
                 "postal_code": "郵便番号",
-                "address": "住所",
+                "address_1": "住所1",
+                "address_2": "住所2",
                 "phone": "電話番号",
                 "mobile": "携帯電話",
                 "fax": "FAX",
@@ -566,7 +576,8 @@ def main():
                             st.write(f"**郵便番号:** {card.get('postal_code', '-')}")
 
                         with col2:
-                            st.write(f"**住所:** {card.get('address', '-')}")
+                            st.write(f"**住所1:** {card.get('address_1', '-')}")
+                            st.write(f"**住所2:** {card.get('address_2', '-')}")
                             st.write(f"**電話番号:** {card.get('phone', '-')}")
                             st.write(f"**携帯電話:** {card.get('mobile', '-')}")
                             st.write(f"**FAX:** {card.get('fax', '-')}")

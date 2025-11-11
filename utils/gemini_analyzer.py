@@ -120,7 +120,8 @@ class GeminiAnalyzer:
 - department: 部署名
 - position: 役職
 - postal_code: 郵便番号
-- address: 住所
+- address_1: 住所1（都道府県、市区町村、町名、番地まで）
+- address_2: 住所2（建物名、階数、部屋番号など）
 - phone: 電話番号（複数ある場合はカンマ区切り）
 - mobile: 携帯電話番号
 - fax: FAX番号
@@ -133,6 +134,9 @@ class GeminiAnalyzer:
 3. 電話番号やFAX番号は、ハイフン付きの形式で出力してください
 4. JSON形式のみを出力し、説明文は含めないでください
 5. 文脈から判断して、適切にフィールドを割り当ててください
+6. 住所は必ず address_1 と address_2 に分けてください
+   - address_1: 都道府県から番地まで（例：東京都渋谷区渋谷1-2-3）
+   - address_2: 建物名以降（例：サンプルビル4F）
 
 【OCRテキスト】
 {ocr_text}
@@ -147,7 +151,8 @@ class GeminiAnalyzer:
   "department": "営業部",
   "position": "部長",
   "postal_code": "123-4567",
-  "address": "東京都渋谷区...",
+  "address_1": "東京都渋谷区渋谷1-2-3",
+  "address_2": "サンプルビル4F",
   "phone": "03-1234-5678",
   "mobile": "090-1234-5678",
   "fax": "03-1234-5679",
@@ -194,7 +199,8 @@ class GeminiAnalyzer:
                 "department": "",
                 "position": "",
                 "postal_code": "",
-                "address": "",
+                "address_1": "",
+                "address_2": "",
                 "phone": "",
                 "mobile": "",
                 "fax": "",
@@ -221,7 +227,8 @@ class GeminiAnalyzer:
                 "department": "",
                 "position": "",
                 "postal_code": "",
-                "address": "",
+                "address_1": "",
+                "address_2": "",
                 "phone": "",
                 "mobile": "",
                 "fax": "",
@@ -237,7 +244,8 @@ class GeminiAnalyzer:
                 "department": "",
                 "position": "",
                 "postal_code": "",
-                "address": "",
+                "address_1": "",
+                "address_2": "",
                 "phone": "",
                 "mobile": "",
                 "fax": "",

@@ -29,7 +29,8 @@ class ExcelExporter:
             "department": "部署",
             "position": "役職",
             "postal_code": "郵便番号",
-            "address": "住所",
+            "address_1": "住所1",
+            "address_2": "住所2",
             "phone": "電話番号",
             "mobile": "携帯電話",
             "fax": "FAX",
@@ -126,7 +127,7 @@ class ExcelExporter:
             # 空のDataFrameを作成
             df = pd.DataFrame(columns=[
                 "name", "name_kana", "company", "department", "position",
-                "postal_code", "address", "phone", "mobile", "fax", "email", "website"
+                "postal_code", "address_1", "address_2", "phone", "mobile", "fax", "email", "website"
             ])
         else:
             df = pd.DataFrame(cards)
