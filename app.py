@@ -11,6 +11,7 @@ from utils.gemini_analyzer import GeminiAnalyzer
 from utils.google_sheets import GoogleSheetsManager
 from utils.data_storage import DataStorage
 from utils.batch_processor import BatchProcessor
+from utils.excel_exporter import ExcelExporter
 
 
 # ページ設定
@@ -278,13 +279,45 @@ def main():
                                 for error in result['errors']:
                                     st.error(f"**{error['filename']}**: {error['error']}")
 
-                        # 処理結果のプレビュー
+                        # 処理結果のプレビューとエクスポート
                         if result['results']:
                             with st.expander("📋 処理された名刺のプレビュー", expanded=True):
                                 df = pd.DataFrame(result['results'])
                                 # 内部フィールドを除外
                                 display_df = df[[col for col in df.columns if not col.startswith('_')]]
                                 st.dataframe(display_df, use_container_width=True)
+
+                            # エクスポートボタン
+                            st.subheader("📥 処理結果をエクスポート")
+                            col_export1, col_export2 = st.columns(2)
+
+                            with col_export1:
+                                # Excelエクスポート
+                                excel_data = ExcelExporter.create_excel_from_cards(
+                                    [clean_data for clean_data in result['results']
+                                     if not any(k.startswith('_') for k in clean_data.keys())]
+                                )
+                                st.download_button(
+                                    label="📊 Excel形式でダウンロード (.xlsx)",
+                                    data=excel_data,
+                                    file_name=f"business_cards_batch_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True,
+                                    type="primary"
+                                )
+
+                            with col_export2:
+                                # CSVエクスポート
+                                csv_df = pd.DataFrame(result['results'])
+                                csv_df = csv_df[[col for col in csv_df.columns if not col.startswith('_')]]
+                                csv_data = csv_df.to_csv(index=False, encoding='utf-8-sig')
+                                st.download_button(
+                                    label="📄 CSV形式でダウンロード (.csv)",
+                                    data=csv_data,
+                                    file_name=f"business_cards_batch_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                    mime="text/csv",
+                                    use_container_width=True
+                                )
 
             # 手動確認モード
             else:
@@ -549,14 +582,31 @@ def main():
         cards = DataStorage.get_all_cards()
 
         if cards:
+            # Excel エクスポート
+            st.subheader("📊 Excel ダウンロード（推奨）")
+            st.info("Excel形式は書式設定付きで、日本語も正しく表示されます。")
+
+            excel_data = ExcelExporter.create_excel_from_cards(cards)
+
+            st.download_button(
+                label="📊 Excel ファイルをダウンロード (.xlsx)",
+                data=excel_data,
+                file_name=f"business_cards_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                type="primary"
+            )
+
+            st.divider()
+
             # CSV エクスポート
-            st.subheader("📥 CSV ダウンロード")
+            st.subheader("📄 CSV ダウンロード")
             csv_data = DataStorage.to_csv()
 
             st.download_button(
-                label="📥 CSV ファイルをダウンロード",
+                label="📄 CSV ファイルをダウンロード",
                 data=csv_data,
-                file_name="business_cards.csv",
+                file_name=f"business_cards_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
                 use_container_width=True
             )
