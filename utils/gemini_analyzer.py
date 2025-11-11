@@ -32,8 +32,8 @@ class GeminiAnalyzer:
                 return False
 
             genai.configure(api_key=self.api_key)
-            # 利用可能な最新モデルを使用
-            self.model = genai.GenerativeModel('gemini-pro')
+            # 軽量・高速・低コストモデルを使用（名刺情報抽出に最適）
+            self.model = genai.GenerativeModel('gemini-1.5-flash-8b')
             return True
         except Exception as e:
             st.error(f"Gemini モデルの初期化に失敗しました: {str(e)}")
