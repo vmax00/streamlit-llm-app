@@ -40,14 +40,18 @@ class GeminiAnalyzer:
             except Exception as list_error:
                 st.warning(f"モデル一覧の取得に失敗: {str(list_error)}")
 
-            # 複数のモデル名を試行
+            # 複数のモデル名を試行（新しいバージョンから優先）
             model_names = [
-                'gemini-1.5-flash',
-                'gemini-1.5-pro',
-                'gemini-pro',
+                'models/gemini-2.5-flash',
+                'models/gemini-2.5-pro',
                 'models/gemini-1.5-flash',
                 'models/gemini-1.5-pro',
-                'models/gemini-pro'
+                'models/gemini-pro',
+                'gemini-2.5-flash',
+                'gemini-2.5-pro',
+                'gemini-1.5-flash',
+                'gemini-1.5-pro',
+                'gemini-pro'
             ]
 
             for model_name in model_names:
