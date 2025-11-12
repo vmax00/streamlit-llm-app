@@ -239,7 +239,19 @@ def main():
             if processing_mode == "🤖 自動一括処理":
                 st.subheader("自動一括処理")
 
-                if st.button("🚀 すべて自動処理して保存", type="primary", use_container_width=True):
+                # 処理ボタンとクリアボタンを横並びに配置
+                col_btn1, col_btn2 = st.columns([3, 1])
+
+                with col_btn1:
+                    start_processing = st.button("🚀 すべて自動処理して保存", type="primary", use_container_width=True)
+
+                with col_btn2:
+                    if 'batch_result' in st.session_state and st.session_state.batch_result:
+                        if st.button("🗑️ 結果をクリア", use_container_width=True):
+                            del st.session_state.batch_result
+                            st.rerun()
+
+                if start_processing:
                     if not credentials_path:
                         st.error("Google Cloud 認証情報をアップロードしてください。")
                     elif not gemini_api_key:
@@ -274,14 +286,6 @@ def main():
                                 time_callback=update_time
                             )
 
-                        # 結果を表示
-                        result_message = f"✅ 処理完了: 成功 {result['success_count']} 件"
-                        if result['skipped_count'] > 0:
-                            result_message += f" / スキップ {result['skipped_count']} 件"
-                        if result['error_count'] > 0:
-                            result_message += f" / エラー {result['error_count']} 件"
-                        st.success(result_message)
-
                         # 成功した名刺をデータベースに保存
                         if result['results']:
                             # 個別の名刺として保存
@@ -302,66 +306,83 @@ def main():
                                     'skipped_count': result['skipped_count']
                                 }
                             )
+                            result['group_id'] = group_id
 
-                            st.balloons()
-                            st.success(f"🎉 {len(result['results'])} 件の名刺を保存しました！ (グループID: {group_id})")
+                        # 結果をセッションステートに保存
+                        st.session_state.batch_result = result
+                        st.balloons()
+                        st.rerun()
 
-                        # スキップされたファイルがあれば表示
-                        if result.get('skipped'):
-                            with st.expander(f"⏭️ スキップされたファイル ({len(result['skipped'])} 件)", expanded=False):
-                                for skipped in result['skipped']:
-                                    st.warning(f"**{skipped['filename']}**: {skipped['reason']}")
+                # 保存された結果を表示
+                if 'batch_result' in st.session_state and st.session_state.batch_result:
+                    result = st.session_state.batch_result
 
-                        # エラーがあれば表示
-                        if result['errors']:
-                            with st.expander(f"⚠️ エラー詳細 ({len(result['errors'])} 件)", expanded=True):
-                                for error in result['errors']:
-                                    st.error(f"**{error['filename']}**: {error['error']}")
+                    # 結果を表示
+                    result_message = f"✅ 処理完了: 成功 {result['success_count']} 件"
+                    if result['skipped_count'] > 0:
+                        result_message += f" / スキップ {result['skipped_count']} 件"
+                    if result['error_count'] > 0:
+                        result_message += f" / エラー {result['error_count']} 件"
+                    st.success(result_message)
 
-                        # 処理結果のプレビューとエクスポート
-                        if result['results']:
-                            with st.expander("📋 処理された名刺のプレビュー", expanded=True):
-                                df = pd.DataFrame(result['results'])
-                                # 内部フィールドを除外
-                                display_df = df[[col for col in df.columns if not col.startswith('_')]]
-                                st.dataframe(display_df, use_container_width=True)
+                    if result.get('group_id'):
+                        st.success(f"🎉 {result['success_count']} 件の名刺を保存しました！ (グループID: {result['group_id']})")
 
-                            # エクスポートボタン
-                            st.subheader("📥 処理結果をエクスポート")
-                            col_export1, col_export2 = st.columns(2)
+                    # スキップされたファイルがあれば表示
+                    if result.get('skipped'):
+                        with st.expander(f"⏭️ スキップされたファイル ({len(result['skipped'])} 件)", expanded=False):
+                            for skipped in result['skipped']:
+                                st.warning(f"**{skipped['filename']}**: {skipped['reason']}")
 
-                            with col_export1:
-                                # Excelエクスポート
-                                excel_data = ExcelExporter.create_excel_from_cards(
-                                    [clean_data for clean_data in result['results']
-                                     if not any(k.startswith('_') for k in clean_data.keys())]
-                                )
-                                st.download_button(
-                                    label="📊 Excel形式でダウンロード (.xlsx)",
-                                    data=excel_data,
-                                    file_name=f"business_cards_batch_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True,
-                                    type="primary"
-                                )
+                    # エラーがあれば表示
+                    if result['errors']:
+                        with st.expander(f"⚠️ エラー詳細 ({len(result['errors'])} 件)", expanded=True):
+                            for error in result['errors']:
+                                st.error(f"**{error['filename']}**: {error['error']}")
 
-                            with col_export2:
-                                # CSVエクスポート
-                                csv_df = pd.DataFrame(result['results'])
-                                csv_df = csv_df[[col for col in csv_df.columns if not col.startswith('_')]]
-                                csv_data = csv_df.to_csv(index=False, encoding='utf-8-sig')
-                                st.download_button(
-                                    label="📄 CSV形式でダウンロード (.csv)",
-                                    data=csv_data,
-                                    file_name=f"business_cards_batch_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                                    mime="text/csv",
-                                    use_container_width=True
-                                )
+                    # 処理結果のプレビューとエクスポート
+                    if result['results']:
+                        with st.expander("📋 処理された名刺のプレビュー", expanded=True):
+                            df = pd.DataFrame(result['results'])
+                            # 内部フィールドを除外
+                            display_df = df[[col for col in df.columns if not col.startswith('_')]]
+                            st.dataframe(display_df, use_container_width=True)
+
+                        # エクスポートボタン
+                        st.subheader("📥 処理結果をエクスポート")
+                        col_export1, col_export2 = st.columns(2)
+
+                        with col_export1:
+                            # Excelエクスポート
+                            excel_data = ExcelExporter.create_excel_from_cards(
+                                [clean_data for clean_data in result['results']
+                                 if not any(k.startswith('_') for k in clean_data.keys())]
+                            )
+                            st.download_button(
+                                label="📊 Excel形式でダウンロード (.xlsx)",
+                                data=excel_data,
+                                file_name=f"business_cards_batch_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True,
+                                type="primary"
+                            )
+
+                        with col_export2:
+                            # CSVエクスポート
+                            csv_df = pd.DataFrame(result['results'])
+                            csv_df = csv_df[[col for col in csv_df.columns if not col.startswith('_')]]
+                            csv_data = csv_df.to_csv(index=False, encoding='utf-8-sig')
+                            st.download_button(
+                                label="📄 CSV形式でダウンロード (.csv)",
+                                data=csv_data,
+                                file_name=f"business_cards_batch_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True
+                            )
 
             # 手動確認モード
             else:
                 st.subheader("手動確認モード")
-                st.info("1枚ずつ確認しながら処理します。各名刺の情報を編集してから保存できます。")
 
                 # セッションステートで現在の処理インデックスを管理
                 if 'batch_index' not in st.session_state:
@@ -370,6 +391,19 @@ def main():
                     st.session_state.batch_results = {}
 
                 current_index = st.session_state.batch_index
+
+                # 説明文とクリアボタンを横並びに配置
+                col_info1, col_info2 = st.columns([3, 1])
+
+                with col_info1:
+                    st.info("1枚ずつ確認しながら処理します。各名刺の情報を編集してから保存できます。")
+
+                with col_info2:
+                    if current_index > 0 or st.session_state.batch_results:
+                        if st.button("🗑️ 進行状況をクリア", use_container_width=True):
+                            st.session_state.batch_index = 0
+                            st.session_state.batch_results = {}
+                            st.rerun()
 
                 if current_index < len(uploaded_files):
                     current_file = uploaded_files[current_index]
